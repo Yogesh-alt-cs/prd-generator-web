@@ -2,10 +2,32 @@ import { openDB, type IDBPDatabase } from "idb";
 import { DEFAULT_DRAFT, DEFAULT_SETTINGS } from "./constants";
 import type { Draft, PrdRecord, Settings } from "./types";
 
-const SETTINGS_KEY = "vibeprd.settings";
-const DRAFT_KEY = "vibeprd.draft";
-const DB_NAME = "vibeprd";
+const SETTINGS_KEY = "qwilr.settings";
+const DRAFT_KEY = "qwilr.draft";
+const DB_NAME = "qwilr";
+const LEGACY_SETTINGS_KEY = "vibeprd.settings";
+const LEGACY_DRAFT_KEY = "vibeprd.draft";
+const LEGACY_DB_NAME = "vibeprd";
 const STORE = "prds";
+
+function migrateLocalKeys() {
+  if (typeof window === "undefined") return;
+  try {
+    for (const [oldKey, newKey] of [
+      [LEGACY_SETTINGS_KEY, SETTINGS_KEY],
+      [LEGACY_DRAFT_KEY, DRAFT_KEY],
+    ] as const) {
+      const old = window.localStorage.getItem(oldKey);
+      if (old !== null) {
+        if (window.localStorage.getItem(newKey) === null) window.localStorage.setItem(newKey, old);
+        window.localStorage.removeItem(oldKey);
+      }
+    }
+  } catch {
+    /* storage unavailable */
+  }
+}
+migrateLocalKeys();
 
 export function loadSettings(): Settings {
   if (typeof window === "undefined") return DEFAULT_SETTINGS;
@@ -42,16 +64,38 @@ export function clearDraft() {
   window.localStorage.removeItem(DRAFT_KEY);
 }
 
+async function migrateLegacyDb(target: IDBPDatabase) {
+  try {
+    if (window.localStorage.getItem("qwilr.dbMigrated")) return;
+    const dbs = indexedDB.databases ? await indexedDB.databases() : [{ name: LEGACY_DB_NAME }];
+    if (dbs.some((d) => d.name === LEGACY_DB_NAME)) {
+      const legacy = await openDB(LEGACY_DB_NAME);
+      if (legacy.objectStoreNames.contains(STORE)) {
+        const rows = (await legacy.getAll(STORE)) as PrdRecord[];
+        for (const row of rows) {
+          await target.put(STORE, { ...row, generator: { ...row.generator, app: "Qwilr" } });
+        }
+      }
+      legacy.close();
+    }
+    window.localStorage.setItem("qwilr.dbMigrated", "1");
+  } catch {
+    /* migration best effort */
+  }
+}
+
 let dbPromise: Promise<IDBPDatabase> | null = null;
 function db() {
   if (!dbPromise) {
-    dbPromise = openDB(DB_NAME, 1, {
-      upgrade(database) {
-        if (!database.objectStoreNames.contains(STORE)) {
-          database.createObjectStore(STORE, { keyPath: "id" });
-        }
-      },
-    });
+    dbPromise = (async () => {
+      const database = await openDB(DB_NAME, 1, {
+        upgrade(d) {
+          if (!d.objectStoreNames.contains(STORE)) d.createObjectStore(STORE, { keyPath: "id" });
+        },
+      });
+      await migrateLegacyDb(database);
+      return database;
+    })();
   }
   return dbPromise;
 }

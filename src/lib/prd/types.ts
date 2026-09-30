@@ -44,7 +44,7 @@ export interface Settings {
   seed: string;
   mode: ThemeMode;
   shape: Shape;
-  toolsUrl: string;
+  maxTokens: number;
 }
 
 export interface PrdFile {
@@ -58,7 +58,7 @@ export interface PrdRecord {
   schemaVersion: "1.0";
   id: string;
   generatedAt: string;
-  generator: { app: "VibePRD"; provider: string; model: string; mode: "local" | "remote" };
+  generator: { app: "Qwilr"; provider: string; model: string; mode: "local" | "remote" };
   project: { name: string; category: string; description: string; notes: string };
   platform: string;
   stack: { frontend: string; backend: string; database: string };

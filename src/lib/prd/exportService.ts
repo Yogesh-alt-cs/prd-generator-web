@@ -14,10 +14,10 @@ function download(blob: Blob, filename: string) {
 }
 
 const slug = (text: string) =>
-  (text || "vibeprd")
+  (text || "qwilr")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "") || "vibeprd";
+    .replace(/^-|-$/g, "") || "qwilr";
 
 export function downloadMarkdownFile(record: PrdRecord, index: number) {
   const file = record.files[index]!;
@@ -184,7 +184,7 @@ export function downloadPdf(record: PrdRecord) {
     doc.setTextColor(140, 140, 150);
     doc.text(`${record.project.name || "Untitled product"} — PRD`, margin, 40);
     doc.text(date, pageWidth - margin, 40, { align: "right" });
-    doc.text("Generated with VibePRD", margin, pageHeight - 32);
+    doc.text("Generated with Qwilr", margin, pageHeight - 32);
     doc.text(`Page ${page} of ${total}`, pageWidth - margin, pageHeight - 32, { align: "right" });
   }
 

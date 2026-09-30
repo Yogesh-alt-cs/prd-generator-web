@@ -142,14 +142,14 @@ export const DEFAULT_DRAFT: Draft = {
 };
 
 export const DEFAULT_SETTINGS: Settings = {
-  provider: "local",
-  model: "Local template",
+  provider: "openrouter",
+  model: "openai/gpt-4o-mini",
   customModel: "",
-  baseUrl: "",
+  baseUrl: "https://openrouter.ai/api/v1",
   apiKey: "",
   systemPrompt: DEFAULT_SYSTEM_PROMPT,
   seed: "#4f46e5",
   mode: "system",
   shape: "rounded",
-  toolsUrl: "https://youbtech.com",
+  maxTokens: 8000,
 };

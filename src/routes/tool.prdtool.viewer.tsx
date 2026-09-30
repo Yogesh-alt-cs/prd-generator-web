@@ -18,9 +18,9 @@ export const Route = createFileRoute("/tool/prdtool/viewer")({
   }),
   head: () => ({
     meta: [
-      { title: "Viewer — VibePRD" },
+      { title: "Viewer — Qwilr" },
       { name: "description", content: "Read, copy and export your PRD package as Markdown, PDF or Meta JSON." },
-      { property: "og:title", content: "Viewer — VibePRD" },
+      { property: "og:title", content: "Viewer — Qwilr" },
       { property: "og:description", content: "Read and export your generated PRD package." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

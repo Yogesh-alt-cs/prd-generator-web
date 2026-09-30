@@ -10,9 +10,9 @@ import type { PrdRecord } from "@/lib/prd/types";
 export const Route = createFileRoute("/tool/prdtool/")({
   head: () => ({
     meta: [
-      { title: "VibePRD — Your PRD packages" },
+      { title: "Qwilr — Your PRD packages" },
       { name: "description", content: "Local-first PRD generator. Browse and manage your saved PRD packages." },
-      { property: "og:title", content: "VibePRD — Your PRD packages" },
+      { property: "og:title", content: "Qwilr — Your PRD packages" },
       { property: "og:description", content: "Turn a guided 6-step brief into a developer-ready PRD package." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

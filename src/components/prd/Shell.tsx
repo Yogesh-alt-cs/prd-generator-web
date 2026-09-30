@@ -1,9 +1,7 @@
 import { Link } from "@tanstack/react-router";
-import { ArrowUpRight } from "lucide-react";
 import type { ReactNode } from "react";
 import logoUrl from "@/assets/qwilr-logo.png";
 import { cn } from "@/lib/utils";
-import { useSettings } from "./SettingsContext";
 
 const NAV = [
   { label: "Dashboard", to: "/tool/prdtool" as const },
@@ -13,8 +11,6 @@ const NAV = [
 ];
 
 export function Shell({ children }: { children: ReactNode }) {
-  const { settings } = useSettings();
-
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <header className="sticky top-0 z-40 w-full border-b border-border bg-card/80 backdrop-blur-md">
@@ -25,7 +21,7 @@ export function Shell({ children }: { children: ReactNode }) {
             </span>
             <span className="mt-1 flex items-center gap-2">
               <img src={logoUrl} alt="Qwilr logo" className="size-7 rounded-md object-contain" />
-              <span className="font-display text-lg font-bold tracking-tight text-foreground">VibePRD</span>
+              <span className="font-display text-lg font-bold tracking-tight text-foreground">Qwilr</span>
               <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
                 LOCAL-FIRST
               </span>
@@ -49,15 +45,6 @@ export function Shell({ children }: { children: ReactNode }) {
             ))}
           </nav>
 
-          <a
-            href={settings.toolsUrl || "#"}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-1 rounded-lg text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-          >
-            Tools
-            <ArrowUpRight className="size-4" aria-hidden />
-          </a>
         </div>
         <nav
           aria-label="Main navigation mobile"

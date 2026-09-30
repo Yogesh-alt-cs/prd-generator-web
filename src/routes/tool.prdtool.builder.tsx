@@ -28,9 +28,9 @@ import type { Draft } from "@/lib/prd/types";
 export const Route = createFileRoute("/tool/prdtool/builder")({
   head: () => ({
     meta: [
-      { title: "Builder — VibePRD" },
+      { title: "Builder — Qwilr" },
       { name: "description", content: "Answer six guided steps to generate a developer-ready PRD package." },
-      { property: "og:title", content: "Builder — VibePRD" },
+      { property: "og:title", content: "Builder — Qwilr" },
       { property: "og:description", content: "Guided 6-step brief for a complete PRD package." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

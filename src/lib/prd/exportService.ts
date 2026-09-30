@@ -79,7 +79,7 @@ function markdownToLines(markdown: string): Line[] {
       const level = heading[1].length;
       const size = [18, 14, 12, 11][level - 1];
       lines.push({ text: clean(heading[2]), size, style: "bold", gap: size * 0.7 });
-      return_continue: continue;
+      continue;
     }
     if (/^\|/.test(line)) {
       if (/^\|[\s:|-]+\|?$/.test(line)) continue;

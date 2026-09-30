@@ -139,7 +139,7 @@ async function readSse(response: Response, pick: (json: any) => string, onDelta?
 interface CallOpts {
   maxTokens: number;
   stream: boolean;
-  onDelta?: OnDelta;
+  onDelta?: OnDelta | undefined;
 }
 
 async function callOpenAiCompatible(settings: Settings, system: string, user: string, o: CallOpts) {

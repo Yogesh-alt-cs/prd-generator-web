@@ -4,7 +4,7 @@ import { localGenerate } from "./localTemplate";
 import type { Draft, PrdFile, PrdRecord, Settings } from "./types";
 
 export class GenerationError extends Error {
-  raw?: string;
+  raw?: string | undefined;
   constructor(message: string, raw?: string) {
     super(message);
     this.raw = raw;
@@ -27,8 +27,8 @@ export function parseSections(raw: string): string[] {
   }
   const sections: string[] = [];
   for (let i = 0; i < FILE_MARKERS.length; i++) {
-    const start = raw.indexOf(FILE_MARKERS[i]) + FILE_MARKERS[i].length;
-    const end = i + 1 < FILE_MARKERS.length ? raw.indexOf(FILE_MARKERS[i + 1]) : raw.length;
+    const start = raw.indexOf(FILE_MARKERS[i]!) + FILE_MARKERS[i]!.length;
+    const end = i + 1 < FILE_MARKERS.length ? raw.indexOf(FILE_MARKERS[i + 1]!) : raw.length;
     const body = raw.slice(start, end).trim();
     if (!body) throw new GenerationError(`Section ${FILE_NAMES[i]} came back empty.`, raw);
     sections.push(body);
@@ -177,7 +177,7 @@ export async function generatePrd(draft: Draft, settings: Settings): Promise<Prd
   }
 
   const files: PrdFile[] = sections.map((content, i) => ({
-    name: FILE_NAMES[i],
+    name: FILE_NAMES[i]!,
     filename: `${FILE_NAMES[i]}.md`,
     wordCount: wordCount(content),
     content,

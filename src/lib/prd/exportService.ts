@@ -20,7 +20,7 @@ const slug = (text: string) =>
     .replace(/^-|-$/g, "") || "vibeprd";
 
 export function downloadMarkdownFile(record: PrdRecord, index: number) {
-  const file = record.files[index];
+  const file = record.files[index]!;
   download(new Blob([file.content], { type: "text/markdown;charset=utf-8" }), file.filename);
 }
 
@@ -76,9 +76,9 @@ function markdownToLines(markdown: string): Line[] {
     }
     const heading = /^(#{1,4})\s+(.*)$/.exec(line);
     if (heading) {
-      const level = heading[1].length;
-      const size = [18, 14, 12, 11][level - 1];
-      lines.push({ text: clean(heading[2]), size, style: "bold", gap: size * 0.7 });
+      const level = heading[1]!.length;
+      const size = [18, 14, 12, 11][level - 1] ?? 11;
+      lines.push({ text: clean(heading[2]!), size, style: "bold", gap: size * 0.7 });
       continue;
     }
     if (/^\|/.test(line)) {
@@ -92,12 +92,12 @@ function markdownToLines(markdown: string): Line[] {
     }
     const bullet = /^\s*[-*]\s+(.*)$/.exec(line);
     if (bullet) {
-      lines.push({ text: `- ${clean(bullet[1])}`, size: 10, style: "normal", gap: 5 });
+      lines.push({ text: `- ${clean(bullet[1]!)}`, size: 10, style: "normal", gap: 5 });
       continue;
     }
     const numbered = /^\s*(\d+)\.\s+(.*)$/.exec(line);
     if (numbered) {
-      lines.push({ text: `${numbered[1]}. ${clean(numbered[2])}`, size: 10, style: "normal", gap: 5 });
+      lines.push({ text: `${numbered[1]}. ${clean(numbered[2]!)}`, size: 10, style: "normal", gap: 5 });
       continue;
     }
     lines.push({ text: clean(line), size: 10, style: "normal", gap: 5 });

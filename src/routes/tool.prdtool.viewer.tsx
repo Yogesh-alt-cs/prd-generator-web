@@ -13,8 +13,8 @@ import { cn } from "@/lib/utils";
 import type { PrdRecord } from "@/lib/prd/types";
 
 export const Route = createFileRoute("/tool/prdtool/viewer")({
-  validateSearch: (s: Record<string, unknown>): { id?: string } => ({
-    id: typeof s.id === "string" ? s.id : undefined,
+  validateSearch: (s: Record<string, unknown>): { id?: string | undefined } => ({
+    id: typeof s["id"] === "string" ? s["id"] : undefined,
   }),
   head: () => ({
     meta: [

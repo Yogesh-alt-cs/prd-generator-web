@@ -1,15 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Eyebrow, Surface } from "@/components/prd/Shell";
 import { useSettings } from "@/components/prd/SettingsContext";
-import { DEFAULT_SETTINGS, DEFAULT_SYSTEM_PROMPT, PROVIDER_MODELS, PROVIDERS } from "@/lib/prd/constants";
-import { testConnection } from "@/lib/prd/generation";
+import { DEFAULT_SETTINGS, DEFAULT_SYSTEM_PROMPT, OPENAI_COMPATIBLE_BASE, PROVIDER_MODELS, PROVIDERS } from "@/lib/prd/constants";
+import { NON_CHAT_PATTERN, testConnection } from "@/lib/prd/generation";
 import { clearAllLocalData } from "@/lib/prd/storage";
 import { cn } from "@/lib/utils";
 import type { ProviderId, Shape, ThemeMode } from "@/lib/prd/types";
@@ -51,16 +51,25 @@ function Seg<T extends string>({ options, value, onChange }: { options: T[]; val
 function SettingsPage() {
   const { settings, update, replace } = useSettings();
   const [testing, setTesting] = useState(false);
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
   const models = PROVIDER_MODELS[settings.provider];
   const remote = settings.provider !== "local";
+  const openAi = remote && settings.provider !== "anthropic" && settings.provider !== "gemini";
+  const preset = OPENAI_COMPATIBLE_BASE[settings.provider] ?? "";
+  const baseUrl = settings.baseUrl || preset;
+  const modelValue = settings.provider === "custom" ? settings.customModel : settings.model;
+  const { warning: urlWarning, suggested } = checkBaseUrl(baseUrl, preset, modelValue);
 
   const test = async () => {
     setTesting(true);
     try {
       const msg = await testConnection(settings);
-      toast.success(msg || "Connection works");
+      setResult({ ok: true, text: msg });
+      toast.success(msg);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Connection failed");
+      const text = e instanceof Error ? e.message : "Connection failed";
+      setResult({ ok: false, text });
+      toast.error(text);
     } finally {
       setTesting(false);
     }
@@ -87,33 +96,52 @@ function SettingsPage() {
           options={PROVIDERS.map((p) => p.id)}
           value={settings.provider}
           onChange={(p: ProviderId) =>
-            update({ provider: p, model: PROVIDER_MODELS[p][0] ?? "", baseUrl: p === "custom" ? settings.baseUrl : "" })
+            update({ provider: p, model: PROVIDER_MODELS[p][0] ?? "", baseUrl: OPENAI_COMPATIBLE_BASE[p] ?? "" })
           }
         />
         {remote && (
           <>
-            {models.length > 0 && (
+            {openAi && (
               <div className="space-y-2">
-                <Label>Model</Label>
-                <Seg options={models} value={settings.model} onChange={(m) => update({ model: m })} />
+                <Label htmlFor="base-url">Base URL</Label>
+                <Input
+                  id="base-url"
+                  value={baseUrl}
+                  onChange={(e) => update({ baseUrl: e.target.value })}
+                  placeholder="https://api.example.com/v1"
+                />
+                {urlWarning && (
+                  <p className="text-xs text-destructive">
+                    {urlWarning}{" "}
+                    {suggested && (
+                      <button type="button" className="font-semibold underline" onClick={() => update({ baseUrl: suggested })}>
+                        Use suggested URL
+                      </button>
+                    )}
+                  </p>
+                )}
               </div>
             )}
-            {settings.provider === "custom" && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Base URL (OpenAI-compatible)</Label>
-                  <Input
-                    value={settings.baseUrl}
-                    onChange={(e) => update({ baseUrl: e.target.value })}
-                    placeholder="https://api.example.com/v1"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Model name</Label>
-                  <Input value={settings.customModel} onChange={(e) => update({ customModel: e.target.value })} />
-                </div>
-              </div>
-            )}
+            <div className="space-y-2">
+              <Label htmlFor="model">Model</Label>
+              <Input
+                id="model"
+                list="model-options"
+                value={modelValue}
+                onChange={(e) =>
+                  update(settings.provider === "custom" ? { customModel: e.target.value } : { model: e.target.value })
+                }
+                placeholder="Model name"
+              />
+              <datalist id="model-options">
+                {models.map((m) => (
+                  <option key={m} value={m} />
+                ))}
+              </datalist>
+              {NON_CHAT_PATTERN.test(modelValue) && (
+                <p className="text-xs text-destructive">This looks like a non-chat model and cannot generate a PRD.</p>
+              )}
+            </div>
             <div className="space-y-2">
               <Label>API key</Label>
               <Input
@@ -127,6 +155,35 @@ function SettingsPage() {
             <Button variant="secondary" onClick={test} disabled={testing}>
               {testing && <Loader2 className="size-4 animate-spin" />} Test connection
             </Button>
+            {result && (
+              <div
+                role="status"
+                className={cn(
+                  "flex items-start justify-between gap-3 rounded-xl border p-3 text-sm",
+                  result.ok ? "border-primary bg-primary-soft text-foreground" : "border-destructive text-destructive",
+                )}
+              >
+                <span>{result.text}</span>
+                <button type="button" aria-label="Dismiss result" onClick={() => setResult(null)}>
+                  <X className="size-4" />
+                </button>
+              </div>
+            )}
+            <details className="rounded-xl border border-border p-3">
+              <summary className="cursor-pointer text-sm font-medium">Advanced</summary>
+              <div className="mt-3 space-y-2">
+                <Label htmlFor="max-tokens">Max tokens</Label>
+                <Input
+                  id="max-tokens"
+                  type="number"
+                  min={256}
+                  max={64000}
+                  value={settings.maxTokens}
+                  onChange={(e) => update({ maxTokens: Number(e.target.value) || 8000 })}
+                  className="max-w-40"
+                />
+              </div>
+            </details>
           </>
         )}
         <div className="space-y-2">
@@ -160,10 +217,6 @@ function SettingsPage() {
             className="h-10 w-16 cursor-pointer rounded-lg border border-border bg-transparent"
           />
         </div>
-        <div className="space-y-2">
-          <Label>Tools link</Label>
-          <Input value={settings.toolsUrl} onChange={(e) => update({ toolsUrl: e.target.value })} />
-        </div>
       </Surface>
 
       <Surface className="flex flex-wrap items-center justify-between gap-4">
@@ -177,4 +230,18 @@ function SettingsPage() {
       </Surface>
     </div>
   );
+}
+
+function checkBaseUrl(url: string, preset: string, model: string): { warning: string; suggested: string } {
+  const u = url.trim().replace(/\/+$/, "");
+  if (!u) return { warning: "", suggested: "" };
+  const fallback = preset || u.replace(/\/(chat\/completions|models\/.*)$/, "");
+  if (!/^https?:\/\//.test(u)) return { warning: "The base URL must start with https://.", suggested: preset };
+  if (/\/chat\/completions$/.test(u))
+    return { warning: "Leave out /chat/completions; it is added automatically.", suggested: u.replace(/\/chat\/completions$/, "") };
+  const last = u.split("/").pop() ?? "";
+  if ((model && u.includes(model.trim())) || /\/models(\/|$)/.test(u) || /[-.:]\d|instruct|gpt|llama|claude/i.test(last))
+    return { warning: "This URL seems to contain a model name. It should be the API root.", suggested: fallback };
+  if (preset && !/\/v1$/.test(u)) return { warning: "This does not look like an API root (missing /v1).", suggested: preset };
+  return { warning: "", suggested: "" };
 }

@@ -69,7 +69,7 @@ function Chips({
   );
 }
 
-function Field({ label, children, error }: { label: string; children: React.ReactNode; error?: string }) {
+function Field({ label, children, error }: { label: string; children: React.ReactNode; error?: string | undefined }) {
   return (
     <div className="space-y-2">
       <Label>{label}</Label>
@@ -84,7 +84,7 @@ function Builder() {
   const navigate = useNavigate();
   const [draft, setDraft] = useState<Draft>(DEFAULT_DRAFT);
   const [step, setStep] = useState(0);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Partial<Record<keyof Draft, string>>>({});
   const [busy, setBusy] = useState(false);
   const [ready, setReady] = useState(false);
 
@@ -99,8 +99,8 @@ function Builder() {
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }));
 
   const validate = (s: number) => {
-    const e: Record<string, string> = {};
-    const need = (cond: boolean, key: string, msg: string) => {
+    const e: Partial<Record<keyof Draft, string>> = {};
+    const need = (cond: boolean, key: keyof Draft, msg: string) => {
       if (cond) e[key] = msg;
     };
     if (s === 0) need(draft.platform === "Custom platform" && !draft.customPlatform.trim(), "customPlatform", "Describe your platform");

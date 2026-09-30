@@ -17,9 +17,9 @@ import type { ProviderId, Shape, ThemeMode } from "@/lib/prd/types";
 export const Route = createFileRoute("/tool/prdtool/settings")({
   head: () => ({
     meta: [
-      { title: "Settings — VibePRD" },
-      { name: "description", content: "Choose your AI provider, model, system prompt and appearance for VibePRD." },
-      { property: "og:title", content: "Settings — VibePRD" },
+      { title: "Settings — Qwilr" },
+      { name: "description", content: "Choose your AI provider, model, system prompt and appearance for Qwilr." },
+      { property: "og:title", content: "Settings — Qwilr" },
       { property: "og:description", content: "Configure providers and appearance. Stored only in your browser." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

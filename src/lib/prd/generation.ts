@@ -188,7 +188,7 @@ export async function generatePrd(draft: Draft, settings: Settings): Promise<Prd
     id: crypto.randomUUID(),
     generatedAt: new Date().toISOString(),
     generator: {
-      app: "VibePRD",
+      app: "Qwilr",
       provider: settings.provider,
       model: isLocal ? "Local template" : resolveModel(settings),
       mode: isLocal ? "local" : "remote",

@@ -25,7 +25,7 @@ export function Shell({ children }: { children: ReactNode }) {
             </span>
             <span className="mt-1 flex items-center gap-2">
               <img src={logoUrl} alt="Qwilr logo" className="size-7 rounded-md object-contain" />
-              <span className="font-display text-lg font-bold tracking-tight text-foreground">VibePRD</span>
+              <span className="font-display text-lg font-bold tracking-tight text-foreground">Qwilr</span>
               <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
                 LOCAL-FIRST
               </span>

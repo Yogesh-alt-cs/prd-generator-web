@@ -14,7 +14,7 @@ export class GenerationError extends Error {
 const wordCount = (text: string) => text.trim().split(/\s+/).filter(Boolean).length;
 
 export function resolveModel(settings: Settings) {
-  return settings.provider === "custom" ? settings.customModel.trim() : settings.model;
+  return (settings.provider === "custom" ? settings.customModel : settings.model).trim();
 }
 
 export function parseSections(raw: string): string[] {
@@ -36,128 +36,220 @@ export function parseSections(raw: string): string[] {
   return sections;
 }
 
-function friendlyError(error: unknown): GenerationError {
-  if (error instanceof GenerationError) return error;
-  const message = error instanceof Error ? error.message : String(error);
-  if (/Failed to fetch|NetworkError|load failed/i.test(message)) {
-    return new GenerationError(
-      "The browser could not reach the provider. This is usually a CORS restriction or no network connection. Providers that block browser requests need a server, or use the local template instead.",
-    );
-  }
-  return new GenerationError(message);
+export const NON_CHAT_PATTERN = /(embedding|embed|whisper|tts|moderation)/i;
+
+export function presetBase(provider: Settings["provider"]) {
+  return OPENAI_COMPATIBLE_BASE[provider] ?? "";
 }
 
-async function readError(response: Response) {
+/** Trimmed, slash-stripped config used for every request. */
+export function normalizeConfig(settings: Settings) {
+  const apiKey = settings.apiKey.trim();
+  const model = resolveModel(settings).trim();
+  const rawBase = settings.baseUrl.trim() || presetBase(settings.provider);
+  const baseUrl = rawBase.replace(/\/+$/, "").replace(/\/chat\/completions$/, "");
+  return { apiKey, model, baseUrl, maxTokens: Math.max(1, Math.floor(settings.maxTokens || 8000)) };
+}
+
+function hostOf(url: string) {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url || "the provider";
+  }
+}
+
+async function readError(response: Response, provider: string) {
   const text = await response.text().catch(() => "");
   let detail = text.slice(0, 400);
   try {
     const parsed = JSON.parse(text);
-    detail = parsed?.error?.message ?? parsed?.message ?? detail;
+    detail = parsed?.error?.message ?? parsed?.message ?? parsed?.detail ?? detail;
+    if (typeof detail !== "string") detail = JSON.stringify(detail);
   } catch {
     /* keep raw text */
   }
-  if (response.status === 401 || response.status === 403) {
-    return new GenerationError(`The provider rejected the API key (${response.status}). ${detail}`);
-  }
-  if (response.status === 429) {
-    return new GenerationError(`The provider is rate limiting this key (429). ${detail}`);
-  }
-  return new GenerationError(`Provider returned ${response.status}. ${detail}`);
+  const s = response.status;
+  let lead: string;
+  if (s === 401 || s === 403) lead = `The API key was rejected by ${provider}.`;
+  else if (s === 404) lead = "Endpoint or model not found. Check the base URL and model name.";
+  else if (s === 400) lead = `${provider} rejected the request. If the model is not a chat model, pick a chat model.`;
+  else if (s === 429) lead = "Rate limit or no credits on this key.";
+  else lead = `${provider} returned an error.`;
+  return new GenerationError(`${lead} (HTTP ${s})${detail ? ` ${detail}` : ""}`, text || undefined);
 }
 
-async function callOpenAiCompatible(
-  settings: Settings,
-  system: string,
-  user: string,
-  maxTokens: number,
-): Promise<string> {
-  const base =
-    settings.provider === "custom"
-      ? settings.baseUrl.trim().replace(/\/$/, "")
-      : OPENAI_COMPATIBLE_BASE[settings.provider];
-  if (!base) throw new GenerationError("No base URL is configured for this provider.");
-  const response = await fetch(`${base}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${settings.apiKey}`,
+function networkError(error: unknown, url: string): GenerationError {
+  if (error instanceof GenerationError) return error;
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return new GenerationError("The request timed out after 120 seconds.");
+  }
+  return new GenerationError(
+    `Could not reach ${hostOf(url)}. Check the base URL and your connection. If the provider blocks browser requests, use openrouter.`,
+  );
+}
+
+type OnDelta = (text: string) => void;
+
+async function request(url: string, init: RequestInit, provider: string): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 120_000);
+  try {
+    const response = await fetch(url, { ...init, signal: controller.signal });
+    if (!response.ok) throw await readError(response, provider);
+    return response;
+  } catch (e) {
+    throw networkError(e, url);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function readSse(response: Response, pick: (json: any) => string, onDelta?: OnDelta) {
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let out = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+    for (const line of lines) {
+      const t = line.trim();
+      if (!t.startsWith("data:")) continue;
+      const payload = t.slice(5).trim();
+      if (!payload || payload === "[DONE]") continue;
+      try {
+        const piece = pick(JSON.parse(payload));
+        if (piece) {
+          out += piece;
+          onDelta?.(out);
+        }
+      } catch {
+        /* partial frame */
+      }
+    }
+  }
+  return out;
+}
+
+interface CallOpts {
+  maxTokens: number;
+  stream: boolean;
+  onDelta?: OnDelta;
+}
+
+async function callOpenAiCompatible(settings: Settings, system: string, user: string, o: CallOpts) {
+  const cfg = normalizeConfig(settings);
+  if (!cfg.baseUrl) throw new GenerationError("Add a base URL in Settings.");
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${cfg.apiKey}`,
+  };
+  if (settings.provider === "openrouter") {
+    headers["HTTP-Referer"] = window.location.origin;
+    headers["X-Title"] = "Qwilr";
+  }
+  const url = `${cfg.baseUrl}/chat/completions`;
+  const response = await request(
+    url,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: cfg.model,
+        max_tokens: o.maxTokens,
+        temperature: 0.4,
+        stream: o.stream,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+      }),
     },
-    body: JSON.stringify({
-      model: resolveModel(settings),
-      max_tokens: maxTokens,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: user },
-      ],
-    }),
-  });
-  if (!response.ok) throw await readError(response);
+    settings.provider,
+  );
+  if (o.stream) return readSse(response, (j) => j?.choices?.[0]?.delta?.content ?? "", o.onDelta);
   const data = await response.json();
   return data?.choices?.[0]?.message?.content ?? "";
 }
 
-async function callAnthropic(settings: Settings, system: string, user: string, maxTokens: number): Promise<string> {
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": settings.apiKey,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
+async function callAnthropic(settings: Settings, system: string, user: string, o: CallOpts) {
+  const cfg = normalizeConfig(settings);
+  const response = await request(
+    "https://api.anthropic.com/v1/messages",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": cfg.apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({
+        model: cfg.model,
+        max_tokens: o.maxTokens,
+        temperature: 0.4,
+        stream: o.stream,
+        system,
+        messages: [{ role: "user", content: user }],
+      }),
     },
-    body: JSON.stringify({
-      model: resolveModel(settings),
-      max_tokens: maxTokens,
-      system,
-      messages: [{ role: "user", content: user }],
-    }),
-  });
-  if (!response.ok) throw await readError(response);
+    "anthropic",
+  );
+  if (o.stream)
+    return readSse(response, (j) => (j?.type === "content_block_delta" ? (j.delta?.text ?? "") : ""), o.onDelta);
   const data = await response.json();
   return (data?.content ?? []).map((part: { text?: string }) => part.text ?? "").join("");
 }
 
-async function callGemini(settings: Settings, system: string, user: string, maxTokens: number): Promise<string> {
-  const model = resolveModel(settings);
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(settings.apiKey)}`,
+async function callGemini(settings: Settings, system: string, user: string, o: CallOpts) {
+  const cfg = normalizeConfig(settings);
+  const method = o.stream ? "streamGenerateContent?alt=sse&" : "generateContent?";
+  const response = await request(
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(cfg.model)}:${method}key=${encodeURIComponent(cfg.apiKey)}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
         contents: [{ role: "user", parts: [{ text: user }] }],
-        generationConfig: { maxOutputTokens: maxTokens },
+        generationConfig: { maxOutputTokens: o.maxTokens, temperature: 0.4 },
       }),
     },
+    "gemini",
   );
-  if (!response.ok) throw await readError(response);
-  const data = await response.json();
-  return (data?.candidates?.[0]?.content?.parts ?? []).map((p: { text?: string }) => p.text ?? "").join("");
+  const pick = (j: any) =>
+    (j?.candidates?.[0]?.content?.parts ?? []).map((p: { text?: string }) => p.text ?? "").join("");
+  if (o.stream) return readSse(response, pick, o.onDelta);
+  return pick(await response.json());
 }
 
-async function callProvider(settings: Settings, system: string, user: string, maxTokens = 8000): Promise<string> {
-  if (settings.provider === "anthropic") return callAnthropic(settings, system, user, maxTokens);
-  if (settings.provider === "gemini") return callGemini(settings, system, user, maxTokens);
-  return callOpenAiCompatible(settings, system, user, maxTokens);
+function callProvider(settings: Settings, system: string, user: string, o: CallOpts): Promise<string> {
+  if (settings.provider === "anthropic") return callAnthropic(settings, system, user, o);
+  if (settings.provider === "gemini") return callGemini(settings, system, user, o);
+  return callOpenAiCompatible(settings, system, user, o);
 }
 
 export async function testConnection(settings: Settings): Promise<string> {
   if (settings.provider === "local") throw new GenerationError("Local mode does not need a connection test.");
-  if (!settings.apiKey.trim()) throw new GenerationError("Add your API key first.");
-  if (!resolveModel(settings)) throw new GenerationError("Choose or type a model first.");
-  if (settings.provider === "custom" && !settings.baseUrl.trim()) {
+  const cfg = normalizeConfig(settings);
+  if (!cfg.apiKey) throw new GenerationError("Add your API key first.");
+  if (!cfg.model) throw new GenerationError("Choose or type a model first.");
+  if (settings.provider === "custom" && !cfg.baseUrl) {
     throw new GenerationError("Add the base URL for your custom provider.");
   }
-  try {
-    const text = await callProvider(settings, "Reply with the single word: ready.", "ping", 16);
-    return text.trim() || "Connected.";
-  } catch (error) {
-    throw friendlyError(error);
-  }
+  await callProvider(settings, settings.systemPrompt, "Reply with the single word: ready.", {
+    maxTokens: 5,
+    stream: false,
+  });
+  return `Connected to ${settings.provider} with model ${cfg.model}.`;
 }
 
-export async function generatePrd(draft: Draft, settings: Settings): Promise<PrdRecord> {
+export async function generatePrd(draft: Draft, settings: Settings, onDelta?: OnDelta): Promise<PrdRecord> {
   const brief = resolveBrief(draft);
   const briefText = buildBriefText(brief);
   const isLocal = settings.provider === "local";
@@ -166,13 +258,13 @@ export async function generatePrd(draft: Draft, settings: Settings): Promise<Prd
   if (isLocal) {
     sections = localGenerate(brief);
   } else {
-    if (!settings.apiKey.trim()) throw new GenerationError("Add your API key in Settings before generating remotely.");
-    let raw: string;
-    try {
-      raw = await callProvider(settings, settings.systemPrompt, briefText);
-    } catch (error) {
-      throw friendlyError(error);
-    }
+    if (!settings.apiKey.trim()) throw new GenerationError(`Add an API key in Settings to generate with ${settings.provider}.`);
+    const raw = await callProvider(settings, settings.systemPrompt, briefText, {
+      maxTokens: normalizeConfig(settings).maxTokens,
+      stream: true,
+      onDelta,
+    });
+    if (!raw.trim()) throw new GenerationError(`${settings.provider} returned an empty response.`, raw);
     sections = parseSections(raw);
   }
 

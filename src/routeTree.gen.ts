@@ -10,33 +10,96 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ToolPrdtoolRouteImport } from './routes/tool.prdtool'
+import { Route as ToolPrdtoolIndexRouteImport } from './routes/tool.prdtool.index'
+import { Route as ToolPrdtoolBuilderRouteImport } from './routes/tool.prdtool.builder'
+import { Route as ToolPrdtoolSettingsRouteImport } from './routes/tool.prdtool.settings'
+import { Route as ToolPrdtoolViewerRouteImport } from './routes/tool.prdtool.viewer'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ToolPrdtoolRoute = ToolPrdtoolRouteImport.update({
+  id: '/tool/prdtool',
+  path: '/tool/prdtool',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ToolPrdtoolIndexRoute = ToolPrdtoolIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ToolPrdtoolRoute,
+} as any)
+const ToolPrdtoolBuilderRoute = ToolPrdtoolBuilderRouteImport.update({
+  id: '/builder',
+  path: '/builder',
+  getParentRoute: () => ToolPrdtoolRoute,
+} as any)
+const ToolPrdtoolSettingsRoute = ToolPrdtoolSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => ToolPrdtoolRoute,
+} as any)
+const ToolPrdtoolViewerRoute = ToolPrdtoolViewerRouteImport.update({
+  id: '/viewer',
+  path: '/viewer',
+  getParentRoute: () => ToolPrdtoolRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/tool/prdtool': typeof ToolPrdtoolRouteWithChildren
+  '/tool/prdtool/builder': typeof ToolPrdtoolBuilderRoute
+  '/tool/prdtool/settings': typeof ToolPrdtoolSettingsRoute
+  '/tool/prdtool/viewer': typeof ToolPrdtoolViewerRoute
+  '/tool/prdtool/': typeof ToolPrdtoolIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/tool/prdtool/builder': typeof ToolPrdtoolBuilderRoute
+  '/tool/prdtool/settings': typeof ToolPrdtoolSettingsRoute
+  '/tool/prdtool/viewer': typeof ToolPrdtoolViewerRoute
+  '/tool/prdtool': typeof ToolPrdtoolIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/tool/prdtool': typeof ToolPrdtoolRouteWithChildren
+  '/tool/prdtool/builder': typeof ToolPrdtoolBuilderRoute
+  '/tool/prdtool/settings': typeof ToolPrdtoolSettingsRoute
+  '/tool/prdtool/viewer': typeof ToolPrdtoolViewerRoute
+  '/tool/prdtool/': typeof ToolPrdtoolIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/tool/prdtool'
+    | '/tool/prdtool/builder'
+    | '/tool/prdtool/settings'
+    | '/tool/prdtool/viewer'
+    | '/tool/prdtool/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/tool/prdtool/builder'
+    | '/tool/prdtool/settings'
+    | '/tool/prdtool/viewer'
+    | '/tool/prdtool'
+  id:
+    | '__root__'
+    | '/'
+    | '/tool/prdtool'
+    | '/tool/prdtool/builder'
+    | '/tool/prdtool/settings'
+    | '/tool/prdtool/viewer'
+    | '/tool/prdtool/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ToolPrdtoolRoute: typeof ToolPrdtoolRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +111,65 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tool/prdtool': {
+      id: '/tool/prdtool'
+      path: '/tool/prdtool'
+      fullPath: '/tool/prdtool'
+      preLoaderRoute: typeof ToolPrdtoolRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tool/prdtool/': {
+      id: '/tool/prdtool/'
+      path: '/'
+      fullPath: '/tool/prdtool/'
+      preLoaderRoute: typeof ToolPrdtoolIndexRouteImport
+      parentRoute: typeof ToolPrdtoolRoute
+    }
+    '/tool/prdtool/builder': {
+      id: '/tool/prdtool/builder'
+      path: '/builder'
+      fullPath: '/tool/prdtool/builder'
+      preLoaderRoute: typeof ToolPrdtoolBuilderRouteImport
+      parentRoute: typeof ToolPrdtoolRoute
+    }
+    '/tool/prdtool/settings': {
+      id: '/tool/prdtool/settings'
+      path: '/settings'
+      fullPath: '/tool/prdtool/settings'
+      preLoaderRoute: typeof ToolPrdtoolSettingsRouteImport
+      parentRoute: typeof ToolPrdtoolRoute
+    }
+    '/tool/prdtool/viewer': {
+      id: '/tool/prdtool/viewer'
+      path: '/viewer'
+      fullPath: '/tool/prdtool/viewer'
+      preLoaderRoute: typeof ToolPrdtoolViewerRouteImport
+      parentRoute: typeof ToolPrdtoolRoute
+    }
   }
 }
 
+interface ToolPrdtoolRouteChildren {
+  ToolPrdtoolBuilderRoute: typeof ToolPrdtoolBuilderRoute
+  ToolPrdtoolSettingsRoute: typeof ToolPrdtoolSettingsRoute
+  ToolPrdtoolViewerRoute: typeof ToolPrdtoolViewerRoute
+  ToolPrdtoolIndexRoute: typeof ToolPrdtoolIndexRoute
+}
+
+const ToolPrdtoolRouteChildren: ToolPrdtoolRouteChildren = {
+  ToolPrdtoolBuilderRoute: ToolPrdtoolBuilderRoute,
+  ToolPrdtoolSettingsRoute: ToolPrdtoolSettingsRoute,
+  ToolPrdtoolViewerRoute: ToolPrdtoolViewerRoute,
+  ToolPrdtoolIndexRoute: ToolPrdtoolIndexRoute,
+}
+
+const ToolPrdtoolRouteWithChildren = ToolPrdtoolRoute._addFileChildren(
+  ToolPrdtoolRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ToolPrdtoolRoute: ToolPrdtoolRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

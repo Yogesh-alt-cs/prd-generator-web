@@ -143,7 +143,7 @@ export const DEFAULT_DRAFT: Draft = {
 
 export const DEFAULT_SETTINGS: Settings = {
   provider: "openrouter",
-  model: "__OR__",
+  model: "openai/gpt-4o-mini",
   customModel: "",
   baseUrl: "https://openrouter.ai/api/v1",
   apiKey: "",
